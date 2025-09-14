@@ -11,7 +11,7 @@ export default function Login() {
   const nav = useNavigate();
   const [email, setEmail] = useState('juan@example.com');
   const [password, setPassword] = useState('1234');
-  const { rut, setRut, setCarreras, setSeleccion } = useApp();
+  const { rut, setRut, carreras, setCarreras, seleccion, setSeleccion } = useApp();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
