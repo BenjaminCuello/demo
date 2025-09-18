@@ -21,7 +21,9 @@ Content-Type: application/json
   "rut": "333333333",
   "codCarrera": "8606",
   "catalogo": "202320",
-  "topeCreditos": 22
+  "topeCreditos": 22,
+  "nivelObjetivo": 3,
+  "prioritarios": ["DCCB-00264"]
 }
 
 ### generar proyeccion con oferta
@@ -33,7 +35,9 @@ Content-Type: application/json
   "codCarrera": "8606",
   "catalogo": "202320",
   "topeCreditos": 22,
-  "period": "202520"
+  "period": "202520",
+  "nivelObjetivo": 3,
+  "prioritarios": ["DCCB-00264"]
 }
 
 ### guardar proyeccion y marcar favorita
@@ -79,3 +83,25 @@ Content-Type: application/json
 
 ### oferta listar por curso y periodo
 GET http://localhost:3000/api/oferta/listar?course=DCCB-00264&period=202520
+### renombrar proyeccion
+PATCH http://localhost:3000/api/proyecciones/NUEVO_ID/nombre
+Content-Type: application/json
+
+{
+  "rut": "333333333",
+  "nombre": "mi plan favorito"
+}
+
+### generar opciones sin oferta
+POST http://localhost:3000/api/proyecciones/generar-opciones
+Content-Type: application/json
+
+{
+  "rut": "333333333",
+  "codCarrera": "8606",
+  "catalogo": "202320",
+  "topeCreditos": 22,
+  "nivelObjetivo": 3,
+  "prioritarios": ["DCCB-00264"],
+  "maxOptions": 5
+}

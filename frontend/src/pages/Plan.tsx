@@ -1,10 +1,11 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useApp } from '../store/appStore';
 import { useRequireRut } from '../hooks/useRequireRut';
 import { useToast } from '../components/Toast';
 
 type Proj = { seleccion: { codigo: string; asignatura: string; creditos: number; nivel: number; nrc?: string; motivo: string }[]; totalCreditos: number };
+type Course = { codigo: string; asignatura: string; creditos: number; nivel: number; prereq: string };
 
 export default function Plan() {
   const rut = useRequireRut();
@@ -12,6 +13,29 @@ export default function Plan() {
   const [proj, setProj] = useState<Proj | null>(null);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
+  const [nivelObjetivo, setNivelObjetivo] = useState<number | ''>('');
+  const [prioritariosCsv, setPrioritariosCsv] = useState('');
+  const prioritarios = prioritariosCsv
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const [malla, setMalla] = useState<Course[]>([]);
+  const [mallaFiltro, setMallaFiltro] = useState('');
+  const [seleccionados, setSeleccionados] = useState<Record<string, boolean>>({});
+  const [opciones, setOpciones] = useState<Proj[]>([]);
+
+  useEffect(() => {
+    // carga malla al cambiar seleccion
+    if (!sel) return;
+    (async () => {
+      try {
+        const data = await api<Course[]>(`/ucn/malla/${encodeURIComponent(sel.codCarrera)}/${encodeURIComponent(sel.catalogo)}`);
+        setMalla(data);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [sel?.codCarrera, sel?.catalogo]);
   const disabled = useMemo(() => !rut || !sel, [rut, sel]);
 
   async function generar(e: FormEvent) {
@@ -21,7 +45,14 @@ export default function Plan() {
     try {
       const data = await api<Proj>('/proyecciones/generar', {
         method: 'POST',
-        body: JSON.stringify({ rut, codCarrera: sel.codCarrera, catalogo: sel.catalogo, topeCreditos: tope }),
+        body: JSON.stringify({
+          rut,
+          codCarrera: sel.codCarrera,
+          catalogo: sel.catalogo,
+          topeCreditos: tope,
+          nivelObjetivo: typeof nivelObjetivo === 'number' ? nivelObjetivo : undefined,
+          prioritarios,
+        }),
       });
       setProj(data);
       toast({ type: 'success', message: 'Proyeccion generada' });
@@ -32,22 +63,48 @@ export default function Plan() {
     }
   }
 
-  async function generarConOferta(e: FormEvent) {
-    e.preventDefault();
+  // generar con oferta deshabilitado segun requerimiento actual
+
+  async function generarOpciones() {
     if (!sel) return;
     setLoading(true);
     try {
-      const data = await api<Proj>('/proyecciones/generar-con-oferta', {
+      const res = await api<{ opciones: Proj[] }>(`/proyecciones/generar-opciones`, {
         method: 'POST',
-        body: JSON.stringify({ rut, codCarrera: sel.codCarrera, catalogo: sel.catalogo, topeCreditos: tope, period }),
+        body: JSON.stringify({
+          rut,
+          codCarrera: sel.codCarrera,
+          catalogo: sel.catalogo,
+          topeCreditos: tope,
+          nivelObjetivo: typeof nivelObjetivo === 'number' ? nivelObjetivo : undefined,
+          prioritarios,
+          maxOptions: 5,
+        }),
       });
-      setProj(data);
-      toast({ type: 'success', message: 'Proyeccion con oferta generada' });
+      setOpciones(res.opciones);
+      toast({ type: 'success', message: `${res.opciones.length} opciones generadas` });
     } catch (e) {
-      toast({ type: 'error', message: (e as Error).message || 'Error al generar con oferta' });
+      toast({ type: 'error', message: (e as Error).message || 'Error al generar opciones' });
     } finally {
       setLoading(false);
     }
+  }
+
+  async function guardarOpcion(p: Proj, favorite: boolean) {
+    if (!sel) return;
+    await api(`/proyecciones/guardar-directo`, {
+      method: 'POST',
+      body: JSON.stringify({
+        rut,
+        codCarrera: sel.codCarrera,
+        catalogo: sel.catalogo,
+        nombre: favorite ? 'favorita' : 'opcion',
+        favorite,
+        totalCreditos: p.totalCreditos,
+        items: p.seleccion,
+      }),
+    });
+    toast({ type: 'success', message: favorite ? 'Opcion guardada como favorita' : 'Opcion guardada' });
   }
 
   async function guardar(favorite: boolean) {
@@ -90,15 +147,100 @@ export default function Plan() {
             <label className="label">Tope Creditos</label>
             <input className="input" type="number" value={tope} onChange={(e) => setTope(Number(e.target.value))} />
           </div>
+          {/* periodo deshabilitado */}
           <div>
-            <label className="label">Periodo (para oferta)</label>
-            <input className="input" value={period} onChange={(e) => setPeriod(e.target.value)} />
+            <label className="label">Nivel objetivo (opcional)</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="3"
+              value={nivelObjetivo}
+              onChange={(e) => setNivelObjetivo(e.target.value ? Number(e.target.value) : '')}
+            />
           </div>
           <div className="flex items-end gap-2">
             <button className="btn" disabled={disabled || loading} type="submit">{loading ? '...' : 'Generar'}</button>
-            <button className="btn" disabled={disabled || loading} onClick={generarConOferta}>Con Oferta</button>
           </div>
         </form>
+        <div className="mt-3">
+          <label className="label">Cursos prioritarios (codigos separados por coma)</label>
+          <input
+            className="input"
+            placeholder="DCCB-00264,DCCB-00106"
+            value={prioritariosCsv}
+            onChange={(e) => setPrioritariosCsv(e.target.value)}
+          />
+        </div>
+        {false && (
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Malla (selector de prioritarios)</h3>
+              <input className="input max-w-[200px]" placeholder="filtrar" value={mallaFiltro} onChange={(e) => setMallaFiltro(e.target.value)} />
+            </div>
+            <div className="max-h-64 overflow-auto mt-2">
+              {malla
+                .filter((c) => c.codigo.toLowerCase().includes(mallaFiltro.toLowerCase()) || c.asignatura.toLowerCase().includes(mallaFiltro.toLowerCase()))
+                .map((c) => (
+                  <label key={c.codigo} className="flex items-center gap-2 py-1">
+                    <input
+                      type="checkbox"
+                      checked={!!seleccionados[c.codigo]}
+                      onChange={(e) => setSeleccionados((prev) => ({ ...prev, [c.codigo]: e.target.checked }))}
+                    />
+                    <span className="text-sm">{c.codigo} · {c.asignatura} · {c.creditos}cr · n{c.nivel}</span>
+                  </label>
+                ))}
+            </div>
+            <div className="mt-2">
+              <button
+                className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
+                onClick={() => {
+                  const selectedCodes = Object.entries(seleccionados)
+                    .filter(([, v]) => v)
+                    .map(([k]) => k);
+                  const merged = Array.from(new Set([...prioritarios, ...selectedCodes]));
+                  setPrioritariosCsv(merged.join(','));
+                  toast({ type: 'success', message: `${selectedCodes.length} agregados a prioritarios` });
+                }}
+              >
+                Agregar seleccionados a prioritarios
+              </button>
+            </div>
+          </div>
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Opciones sugeridas</h3>
+              <button className="btn" onClick={generarOpciones} disabled={loading || !sel}>Generar opciones</button>
+            </div>
+            <div className="mt-2 space-y-3">
+              {opciones.map((p, idx) => (
+                <div key={idx} className="border rounded p-2">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">Opcion #{idx + 1} · {p.totalCreditos} creditos</div>
+                    <div className="flex gap-2">
+                      <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => guardarOpcion(p, false)}>Guardar</button>
+                      <button className="btn" onClick={() => guardarOpcion(p, true)}>Guardar favorita</button>
+                    </div>
+                  </div>
+                  <ul className="mt-2 text-sm text-gray-700 list-disc pl-5">
+                    {p.seleccion.map((c) => {
+                      const tags: string[] = [];
+                      if (prioritarios.includes(c.codigo)) tags.push('prioridad');
+                      if (c.motivo === 'REPROBADO') tags.push('reprobado');
+                      const tagStr = tags.length ? ` [${tags.join(', ')}]` : '';
+                      return (
+                        <li key={c.codigo}>{c.codigo} · {c.asignatura} ({c.creditos}){tagStr}</li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
+              {opciones.length === 0 && <div className="text-sm text-gray-600">Genera opciones para ver alternativas</div>}
+            </div>
+          </div>
+        </div>
+        )}
       </div>
 
       {proj && (
@@ -138,6 +280,74 @@ export default function Plan() {
           </div>
         </div>
       )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Malla (selector de prioritarios)</h3>
+            <input className="input max-w-[200px]" placeholder="filtrar" value={mallaFiltro} onChange={(e) => setMallaFiltro(e.target.value)} />
+          </div>
+          <div className="max-h-64 overflow-auto mt-2">
+            {malla
+              .filter((c) => c.codigo.toLowerCase().includes(mallaFiltro.toLowerCase()) || c.asignatura.toLowerCase().includes(mallaFiltro.toLowerCase()))
+              .map((c) => (
+                <label key={c.codigo} className="flex items-center gap-2 py-1">
+                  <input
+                    type="checkbox"
+                    checked={!!seleccionados[c.codigo]}
+                    onChange={(e) => setSeleccionados((prev) => ({ ...prev, [c.codigo]: e.target.checked }))}
+                  />
+                  <span className="text-sm">{c.codigo} · {c.asignatura} ({c.creditos}) · n{c.nivel}</span>
+                </label>
+              ))}
+          </div>
+          <div className="mt-2">
+            <button
+              className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200"
+              onClick={() => {
+                const selectedCodes = Object.entries(seleccionados)
+                  .filter(([, v]) => v)
+                  .map(([k]) => k);
+                const merged = Array.from(new Set([...prioritarios, ...selectedCodes]));
+                setPrioritariosCsv(merged.join(','));
+                toast({ type: 'success', message: `${selectedCodes.length} agregados a prioritarios` });
+              }}
+            >
+              Agregar seleccionados a prioritarios
+            </button>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Opciones sugeridas</h3>
+            <button className="btn" onClick={generarOpciones} disabled={loading || !sel}>Generar opciones</button>
+          </div>
+          <div className="mt-2 space-y-3">
+            {(prioritarios.length ? opciones.filter((p) => p.seleccion.some((x) => prioritarios.includes(x.codigo))) : opciones).map((p, idx) => (
+              <div key={idx} className="border rounded p-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium">Opcion #{idx + 1} · {p.totalCreditos} creditos</div>
+                  <div className="flex gap-2">
+                    <button className="px-3 py-1 rounded bg-gray-100 hover:bg-gray-200" onClick={() => guardarOpcion(p, false)}>Guardar</button>
+                    <button className="btn" onClick={() => guardarOpcion(p, true)}>Guardar favorita</button>
+                  </div>
+                </div>
+                <ul className="mt-2 text-sm text-gray-700 list-disc pl-5">
+                  {p.seleccion.map((c) => {
+                    const tags: string[] = [];
+                    if (prioritarios.includes(c.codigo)) tags.push('prioridad');
+                    if (c.motivo === 'REPROBADO') tags.push('reprobado');
+                    const tagStr = tags.length ? ` [${tags.join(', ')}]` : '';
+                    return (
+                      <li key={c.codigo}>{c.codigo} · {c.asignatura} ({c.creditos}){tagStr}</li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+            {opciones.length === 0 && <div className="text-sm text-gray-600">Genera opciones para ver alternativas</div>}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

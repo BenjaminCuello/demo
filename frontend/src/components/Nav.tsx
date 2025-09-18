@@ -35,12 +35,10 @@ export default function Nav() {
               {rut} · {seleccion.codCarrera}-{seleccion.catalogo}
             </div>
           )}
-          {link('/', 'Login')}
-          {link('/plan', 'Generar')}
-          {link('/proyecciones', 'Mis Proyecciones')}
-          {link('/demanda', 'Demanda')}
-          {link('/oferta', 'Oferta CSV')}
-          {link('/admin', adminKey ? 'Admin ✓' : 'Admin')}
+          {!rut && link('/', 'Login')}
+          {rut && link('/plan', 'Generar')}
+          {rut && link('/proyecciones', 'Mis Proyecciones')}
+          {rut && link('/demanda', 'Demanda')}
           {rut && (
             <button className="px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-gray-700" onClick={logout}>Salir</button>
           )}

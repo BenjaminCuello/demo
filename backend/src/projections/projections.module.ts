@@ -2,6 +2,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { GenerateProjectionWithOfferUseCase } from '../application/use-cases/generate-projection-with-offer.usecase';
+import { GenerateProjectionOptionsUseCase } from '../application/use-cases/generate-projection-options.usecase';
 import { GenerateProjectionUseCase } from '../application/use-cases/generate-projection.usecase';
 import { ProjectionRepository } from '../infra/db/projection.repository';
 import { Projection, ProjectionSchema } from '../infra/db/projection.schema';
@@ -22,6 +23,7 @@ import { ProjectionsController } from '../web/projections.controller';
     ProjectionRepository,
     GenerateProjectionUseCase,
     GenerateProjectionWithOfferUseCase,
+    GenerateProjectionOptionsUseCase,
   ],
 })
 export class ProjectionsModule {}

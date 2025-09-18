@@ -22,6 +22,7 @@ import {
 
 import { GenerateProjectionWithOfferUseCase } from '../application/use-cases/generate-projection-with-offer.usecase';
 import { GenerateProjectionUseCase } from '../application/use-cases/generate-projection.usecase';
+import { GenerateProjectionOptionsUseCase } from '../application/use-cases/generate-projection-options.usecase';
 import { ProjectionRepository } from '../infra/db/projection.repository';
 
 export class GenerarProyeccionDto {
@@ -29,6 +30,8 @@ export class GenerarProyeccionDto {
   @IsString() @IsNotEmpty() codCarrera!: string;
   @IsString() @IsNotEmpty() catalogo!: string;
   @Type(() => Number) @IsNumber() @Min(1) topeCreditos!: number;
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(1) nivelObjetivo?: number;
+  @IsOptional() @Type(() => String) prioritarios?: string[];
 }
 
 export class GuardarProyeccionDto extends GenerarProyeccionDto {
@@ -51,6 +54,7 @@ export class ProjectionsController {
     private readonly usecase: GenerateProjectionUseCase,
     private readonly repo: ProjectionRepository,
     private readonly usecaseOffer: GenerateProjectionWithOfferUseCase,
+    private readonly usecaseOptions: GenerateProjectionOptionsUseCase,
   ) {}
 
   @Post('generar')
@@ -65,6 +69,13 @@ export class ProjectionsController {
   @ApiBody({ type: GenerarConOfertaDto })
   generarConOferta(@Body() dto: GenerarConOfertaDto) {
     return this.usecaseOffer.exec(dto);
+  }
+
+  @Post('generar-opciones')
+  @ApiOperation({ summary: 'Generar varias opciones de proyeccion (sin oferta)' })
+  @ApiBody({ type: GenerarProyeccionDto })
+  generarOpciones(@Body() dto: GenerarProyeccionDto & { maxOptions?: number }) {
+    return this.usecaseOptions.exec(dto);
   }
 
   @Post('guardar')
@@ -109,6 +120,41 @@ export class ProjectionsController {
   async borrar(@Param('id') id: string, @Query('rut') rut: string) {
     await this.repo.delete(rut, id);
     return { ok: true };
+  }
+
+  @Patch(':id/nombre')
+  @ApiOperation({ summary: 'Renombrar proyeccion' })
+  async renombrar(
+    @Param('id') id: string,
+    @Body() body: { rut: string; nombre: string },
+  ) {
+    await this.repo.updateName(body.rut, id, body.nombre);
+    return { ok: true };
+  }
+
+  @Post('guardar-directo')
+  @ApiOperation({ summary: 'Guardar proyeccion desde items ya calculados' })
+  @ApiBody({ description: 'Recibe items tal cual para persistir' })
+  async guardarDirecto(
+    @Body()
+    body: {
+      rut: string;
+      codCarrera: string;
+      catalogo: string;
+      nombre?: string;
+      favorite?: boolean;
+      totalCreditos: number;
+      items: Array<{
+        codigo: string;
+        asignatura: string;
+        creditos: number;
+        nivel: number;
+        motivo: 'REPROBADO' | 'PENDIENTE';
+        nrc?: string;
+      }>;
+    },
+  ) {
+    return this.repo.createAndMaybeFavorite(body);
   }
 
   @Get('demanda/agregada')

@@ -109,4 +109,18 @@ export class ProjectionRepository {
     ];
     return this.model.aggregate(pipeline).exec();
   }
+
+  async updateName(rut: string, id: string, nombre: string) {
+    if (!isValidObjectId(id)) {
+      throw new BadRequestException('id invalido');
+    }
+    const _id = new Types.ObjectId(id);
+    const res = await this.model
+      .updateOne({ _id, rut }, { $set: { nombre } })
+      .exec();
+    const matched = res.matchedCount ?? 0;
+    if (matched === 0) {
+      throw new NotFoundException('proyeccion no encontrada');
+    }
+  }
 }

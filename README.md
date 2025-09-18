@@ -1,139 +1,72 @@
-# Planificador UCN — Backend (NestJS) + Frontend (React + Vite)
+# Planificador UCN (NestJS + React + Mongo)
 
-## Descripción general
-
-- **Backend:** NestJS + Mongoose + Axios + Swagger opcional + Helmet + rate limit
-- **Frontend:** React + Vite + Tailwind CSS
-- **Base de datos:** MongoDB
-- **Integraciones:** APIs oficiales UCN (Login, Malla, Avance) con stubs y respaldos en CSV/JSON
+## Tecnologias
+- Backend: NestJS + Mongoose + Axios + Swagger opcional + Helmet + rate limit
+- Frontend: React + Vite + Tailwind CSS
+- Base de datos: MongoDB
+- Integraciones: APIs UCN (Login, Malla, Avance) con stubs y respaldos CSV/JSON
 
 ## Requisitos
-
 - Node.js 20+
 - MongoDB 7+ (o Docker)
 
-## Configuración
-
+## Configuracion
 ### Backend
-
-1. Copiar `backend/.env.example` a `backend/.env` y ajustar:
-   - `MONGO_URI`: cadena de conexión a Mongo
-   - `ALLOWED_ORIGINS`: por defecto `http://localhost:5173,http://localhost:8080`
-   - `USE_STUBS=true` para trabajar offline con datos de ejemplo
-   - `ADMIN_API_KEY`: clave secreta para endpoints de administración
-   - `USE_BACKUP_FALLBACK=true` para servir respaldos cuando UCN no responda
-   - `SWAGGER_ENABLED=true` para exponer `/api/docs` en desarrollo
+1. Copia `backend/.env.example` a `backend/.env` y ajusta:
+   - `MONGO_URI` cadena de conexion
+   - `ALLOWED_ORIGINS` (por defecto `http://localhost:5173,http://localhost:8080`)
+   - `USE_STUBS=true` para trabajar offline
+   - `ADMIN_API_KEY` clave para endpoints admin
+   - `USE_BACKUP_FALLBACK=true` para servir respaldos si UCN falla
+   - `SWAGGER_ENABLED=true` para ver `/api/docs` en dev
 
 ### Frontend
+1. Copia `frontend/.env.example` a `frontend/.env` (por defecto `VITE_API_BASE=http://localhost:3000/api`)
 
-1. Copiar `frontend/.env.example` a `frontend/.env` y ajustar si es necesario:
-   - `VITE_API_BASE=http://localhost:3000/api`
+## Ejecutar en desarrollo
+- Local
+  - Backend: `cd backend && npm install && npm run start:dev`
+  - Frontend: `cd frontend && npm install && npm run dev` → abre `http://localhost:5173`
+  - Desde la raiz: `npm install && npm run all:dev` (levanta ambos)
+- Docker
+  - `docker compose up --build`
+  - Frontend: `http://localhost:8080` | Backend: `http://localhost:3000`
 
-## Ejecución en desarrollo
+## Uso (UI)
+1) Login (demo)
+- Ingresa RUT y password (ver “Credenciales demo”). Al autenticar se listan carreras/catalogos del estudiante (elige una).
+- “Olvide mi contraseña”: valida RUT + email y muestra mensaje de exito (solo demostrativo, no envia correos).
+- Acceso administrador esta en la pagina de login (no en la interfaz del estudiante).
 
-### Opción A (local)
+2) Plan (/plan)
+- Define tope de creditos y genera la seleccion principal (prioriza reprobados, luego atrasados segun nivel objetivo y luego prioritarios, siempre respetando prerrequisitos y tope).
+- Debajo de la seleccion principal veras:
+  - “Malla (selector de prioritarios)”: marca cursos y agregalos a la lista de prioritarios.
+  - “Opciones sugeridas”: genera alternativas sin oferta. Se muestran opciones que incluyen tus cursos prioritarios y mantienen reprobados cuando aplica. Cada curso se muestra como:
+    - `COD · Asignatura (creditos) [prioridad, reprobado]` (sin [PENDIENTE]).
+- Guarda la proyeccion (o como favorita).
 
-- Backend: `cd backend && npm install && npm run start:dev`
-- Frontend: `cd frontend && npm install && npm run dev` → abrir `http://localhost:5173`
-- Desde la raíz del repo (ambos en paralelo):
-  - Primera vez: `npm install` (para instalar `concurrently` en el root)
-  - Ejecutar: `npm run all:dev`
+3) Mis proyecciones (/proyecciones)
+- Lista, expande “Ver malla” para ver cursos y creditos, marca favorita y borra. Puedes renombrar cada proyeccion.
 
-### Opción B (Docker stack completo)
+4) Demanda (/demanda)
+- Ver demanda agregada por codigo o por NRC (solo favoritas).
 
-- `docker compose up --build`
-- Frontend: `http://localhost:8080`
-- Backend: `http://localhost:3000`
-- Mongo: `mongodb://localhost:27017`
+5) Admin y oferta
+- En /admin ingresa `X-ADMIN-KEY` para acceder a carga de oferta CSV en /oferta (solo admin). En esta demo la generacion “con oferta” esta deshabilitada.
 
-## Swagger
+## Credenciales demo
+- Estudiante 1: rut `333333333`, email `juan@example.com`, password `1234` (ICCI 201610)
+- Estudiante 2: rut `222222222`, email `maria@example.com`, password `abcd` (ITI 202410)
+- Estudiante 3: rut `111111111`, email `ximena@example.com`, password `qwerty` (ICCI 201610)
 
-- **Dev:** `http://localhost:3000/api/docs`
-- **Producción:** deshabilitado por defecto (controlado por `SWAGGER_ENABLED`)
-
-## Uso de la aplicación (UI)
-
-- Abrir `http://localhost:5173` (o `http://localhost:8080` con Docker Compose)
-
-### Login
-
-- Con `USE_STUBS=true`, ejemplos de credenciales: `juan@example.com` / `1234`
-- Elegir carrera + catálogo de la lista
-
-### Generar proyección (`/plan`)
-
-- Definir tope de créditos (ej. 22)
-- Opcional: definir período (ej. `202520`) y usar “Con Oferta” si cargaste CSV de oferta
-- Revisar selección; guardar y/o marcar como favorita
-
-### Mis proyecciones (`/proyecciones`)
-
-- Listar historial, marcar favorita (confirma reemplazo), y borrar (con confirmación)
-
-### Demanda (`/demanda`)
-
-- Ver demanda agregada por código de curso o por NRC (solo favoritas)
-
-### Oferta (`/oferta`)
-
-- Primero ir a `/admin` e ingresar tu `X-ADMIN-KEY` (debe coincidir con `ADMIN_API_KEY` del backend)
-- Subir CSV (cabecera: `period,nrc,course,codigoparalelo,dia,inicio,fin,sala,cupos`) y luego listar ofertas
-
-## Funcionalidades
-
-- Prioriza ramos reprobados y respeta prerrequisitos y tope de créditos
-- Permite guardar múltiples proyecciones y marcar una favorita
-- Selecciona NRCs de la oferta evitando choques de horario
-- Calcula demanda agregada por curso o NRC a partir de favoritas
-- Integración con APIs de UCN (login, malla, avance), con stubs para demo y respaldos CSV/JSON con fallback
-- Carga de oferta CSV (admin) para potenciar la selección de NRCs
-
-## Arquitectura y flujo
-
-### Backend (NestJS)
-
-- **domain:** reglas de negocio (ProjectionService arma la selección; ScheduleService revisa choques de horario)
-- **application:** casos de uso (GenerateProjection\*, etc.)
-- **infra:**
-  - **db:** esquemas y repositorios Mongoose (proyecciones, ofertas) con índices útiles
-  - **ucn:** gateways HTTP a UCN y controladores de respaldo admin (seguros con X-ADMIN-KEY)
-- **web:** controladores HTTP (ofertas, proyecciones, health, proxies ucn)
-
-### Estrategia de datos
-
-- Malla y avance desde UCN; con `USE_STUBS=true` se usan datos de demo
-- Si UCN falla y `USE_BACKUP_FALLBACK=true`, se sirven respaldos desde Mongo
-- Oferta proviene de CSV, guardada en Mongo, indexada por `course` y `period`
-
-### Seguridad backend
-
-- CORS controlado por `ALLOWED_ORIGINS`, Helmet, límites globales y específicos en `/api/ucn`
-- Validación estricta de DTOs (ValidationPipe + class-validator)
-- Endpoints admin requieren `X-ADMIN-KEY`
-
-### Frontend (React + Vite + Tailwind)
-
-- Rutas: Login, Plan, Proyecciones, Demanda, Oferta, Admin, 404
-- Estado global persistente (rut, carreras, selección, tope, período, adminKey)
-- UX: toasts, confirmaciones, guards de rutas por rut y adminKey
-- **Dev:** Vite proxy `/api` → backend
-- **Prod (Docker):** Nginx sirve la SPA y proxya `/api`
-
-## Resumen de API
-
-- **Health:** `GET /api/health` (incluye `mongo.readyState`)
-- **UCN (proxy):** `GET /api/ucn/login`, `GET /api/ucn/malla/:cod/:catalogo`, `GET /api/ucn/avance?rut&codcarrera`
-- **Proyecciones:** generar/guardar/listar/favorita/borrar/demanda
-- **Oferta CSV (admin):** `POST /api/oferta/cargar` (requiere `X-ADMIN-KEY`), `GET /api/oferta/listar`
-- **Respaldos (admin):** `POST/GET /api/ucn/respaldo/malla`, `POST/GET /api/ucn/respaldo/avance` (requieren `X-ADMIN-KEY`)
+## API destacado
+- Health: `GET /api/health`
+- Auth (demo): `POST /api/auth/login`, `POST /api/auth/forgot`
+- UCN (proxy): `GET /api/ucn/malla/:cod/:catalogo`, `GET /api/ucn/avance?rut&codcarrera`
+- Proyecciones: generar / generar-opciones / guardar / favorita / renombrar / borrar / demanda
+- Admin: oferta CSV y respaldos UCN (requiere `X-ADMIN-KEY`)
 
 ## Problemas comunes
-
-- IDE muestra “module not found” en módulos locales: reinicia TS Server (VS Code → “TypeScript: Restart TS Server”)
-- Mongo no disponible: revisar `MONGO_URI` o usar `docker compose`
-- CORS: ajustar `ALLOWED_ORIGINS`
-- UCN caída: habilitar `USE_STUBS=true` y/o cargar respaldos con `USE_BACKUP_FALLBACK=true`
-
-## Licencia
-
-- Proyecto académico. Adaptar según sea necesario
+- Si Vite usa otro puerto, abre la URL “Local: …” que imprime y agrega ese origen a `ALLOWED_ORIGINS` si es necesario.
+- Si Mongo no levanta, usa Docker o revisa `MONGO_URI`.

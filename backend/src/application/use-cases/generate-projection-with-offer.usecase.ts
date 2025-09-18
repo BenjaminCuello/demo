@@ -18,12 +18,16 @@ export class GenerateProjectionWithOfferUseCase {
     catalogo: string;
     topeCreditos: number;
     period: string;
+    nivelObjetivo?: number;
+    prioritarios?: string[];
   }) {
     const baseProj = await this.base.exec({
       rut: params.rut,
       codCarrera: params.codCarrera,
       catalogo: params.catalogo,
       topeCreditos: params.topeCreditos,
+      nivelObjetivo: params.nivelObjetivo,
+      prioritarios: params.prioritarios,
     });
 
     const elegidos: Array<{

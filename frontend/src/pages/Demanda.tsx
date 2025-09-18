@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useToast } from '../components/Toast';
+import { useRequireRut } from '../hooks/useRequireRut';
 
 type DemItem = { _id: string; codigo?: string; nrc?: string; count: number };
 
 export default function Demanda() {
+  useRequireRut();
   const [codCarrera, setCodCarrera] = useState('');
   const [por, setPor] = useState<'codigo' | 'nrc'>('codigo');
   const [data, setData] = useState<DemItem[]>([]);

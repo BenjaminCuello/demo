@@ -73,6 +73,8 @@ export class GenerateProjectionUseCase {
     codCarrera: string;
     catalogo: string;
     topeCreditos: number;
+    nivelObjetivo?: number;
+    prioritarios?: string[];
   }): Promise<ProjectionResult> {
     const mallaRaw = await this.mallasGw.malla(
       params.codCarrera,
@@ -102,6 +104,8 @@ export class GenerateProjectionUseCase {
       malla,
       avance,
       topeCreditos: params.topeCreditos,
+      nivelObjetivo: params.nivelObjetivo,
+      prioritarios: params.prioritarios,
     });
   }
 }
